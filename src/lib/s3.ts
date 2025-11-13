@@ -4,26 +4,31 @@ import {
   PutObjectCommand, 
 } from "@aws-sdk/client-s3";
 
-const S3_REGION = process.env.AWS_REGION ?? process.env.S3_REGION; 
-const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
-
-if (!S3_REGION) {
-  throw new Error("S3 configuration missing. Please set AWS_REGION or S3_REGION.");
-}
-
-if (!S3_BUCKET_NAME) {
-  throw new Error("S3 configuration missing. Please set S3_BUCKET_NAME.");
-}
-
 const globalForS3 = globalThis as unknown as {
   s3Client?: S3Client;
 };
 
 // --- CLIENT INITIALIZATION ---
 
+const getS3Region = () => {
+  const region = process.env.AWS_REGION ?? process.env.S3_REGION;
+  if (!region) {
+    throw new Error("S3 configuration missing. Please set AWS_REGION or S3_REGION.");
+  }
+  return region;
+};
+
+const getS3BucketName = () => {
+  const bucket = process.env.S3_BUCKET_NAME;
+  if (!bucket) {
+    throw new Error("S3 configuration missing. Please set S3_BUCKET_NAME.");
+  }
+  return bucket;
+};
+
 const createClient = () => {
   const clientConfig = {
-    region: S3_REGION,
+    region: getS3Region(),
   };
 
   return new S3Client(clientConfig);
@@ -52,11 +57,13 @@ type UploadParams = {
  */
 export const uploadFileToS3 = async ({ key, body, contentType }: UploadParams) => {
   const client = getS3Client();
+  const bucket = getS3BucketName();
+  const region = getS3Region();
 
   try {
     await client.send(
       new PutObjectCommand({
-        Bucket: S3_BUCKET_NAME,
+        Bucket: bucket,
         Key: key,
         Body: body,
         ContentType: contentType,
@@ -64,7 +71,7 @@ export const uploadFileToS3 = async ({ key, body, contentType }: UploadParams) =
       })
     );
     
-    return `https://${S3_BUCKET_NAME}.s3.${S3_REGION}.amazonaws.com/${key}`;
+    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
     
   } catch (error) {
     console.error("S3 Upload Error:", error);
@@ -78,11 +85,12 @@ export const uploadFileToS3 = async ({ key, body, contentType }: UploadParams) =
  */
 export const deleteFileFromS3 = async (key: string) => {
   const client = getS3Client();
+  const bucket = getS3BucketName();
 
   try {
     await client.send(
       new DeleteObjectCommand({
-        Bucket: S3_BUCKET_NAME,
+        Bucket: bucket,
         Key: key
       })
     );
