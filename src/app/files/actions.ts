@@ -53,9 +53,11 @@ export async function uploadFileAction(formData: FormData) {
 }
 
 export async function deleteFileAction(id: string) {
-  const existing = await db.query.files.findFirst({
-    where: (file, { eq }) => eq(file.id, id)
-  });
+  const [existing] = await db
+    .select()
+    .from(files)
+    .where(eq(files.id, id))
+    .limit(1);
 
   if (!existing) {
     throw new Error("File not found.");
@@ -68,9 +70,11 @@ export async function deleteFileAction(id: string) {
 }
 
 export async function getDownloadUrlAction(id: string) {
-  const file = await db.query.files.findFirst({
-    where: (row, { eq }) => eq(row.id, id)
-  });
+  const [file] = await db
+    .select()
+    .from(files)
+    .where(eq(files.id, id))
+    .limit(1);
 
   if (!file) {
     throw new Error("File not found.");
