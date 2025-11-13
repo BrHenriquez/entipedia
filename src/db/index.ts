@@ -33,18 +33,37 @@ function createPool() {
 }
 
 // Create pool and db lazily - only when first accessed
-// But we need to export them, so we'll create them on first access via a function call
-export const pool = globalForDb.pool ?? createPool();
-export const db = globalForDb.db ?? drizzle(pool, { schema });
-
-// Store in global for reuse
-if (!globalForDb.pool) {
-  globalForDb.pool = pool;
+function getPool(): Pool {
+  if (!globalForDb.pool) {
+    globalForDb.pool = createPool();
+  }
+  return globalForDb.pool;
 }
 
-if (!globalForDb.db) {
-  globalForDb.db = db;
+function getDb(): ReturnType<typeof drizzle<typeof schema>> {
+  if (!globalForDb.db) {
+    globalForDb.db = drizzle(getPool(), { schema });
+  }
+  return globalForDb.db;
 }
+
+// Export with lazy initialization using Proxy to defer connection until first use
+// This prevents errors during Next.js build when DATABASE_URL might not be available
+export const pool = new Proxy({} as Pool, {
+  get(_target, prop) {
+    const actualPool = getPool();
+    const value = actualPool[prop as keyof Pool];
+    return typeof value === 'function' ? value.bind(actualPool) : value;
+  }
+}) as Pool;
+
+export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
+  get(_target, prop) {
+    const actualDb = getDb();
+    const value = actualDb[prop as keyof ReturnType<typeof drizzle<typeof schema>>];
+    return typeof value === 'function' ? value.bind(actualDb) : value;
+  }
+}) as ReturnType<typeof drizzle<typeof schema>>;
 
 export type Database = typeof db;
 export * from "./schema";
